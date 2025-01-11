@@ -101,7 +101,7 @@ namespace SameStatsCodeUI
 
             ProcessStartInfo startInfo = new ProcessStartInfo();
             startInfo.FileName = "python";
-            startInfo.Arguments = "same_stats.py run dino circle 200000 2 150";
+            startInfo.Arguments = "same_stats.py run rando circle 200000 2 150";
             startInfo.RedirectStandardOutput = true;
             startInfo.RedirectStandardError = true;
             startInfo.UseShellExecute = false;
@@ -162,24 +162,36 @@ namespace SameStatsCodeUI
         private void MonitorResults()
         {
             string resultsFolderPath = Path.Combine(pythonCodeFolderPath, "results");
+            FileSystemWatcher watcher = new FileSystemWatcher
+            {
+                Path = resultsFolderPath,
+                Filter = "circle-image-*.png",
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
+                EnableRaisingEvents = true
+            };
+
+            watcher.Created += (s, e) =>
+            {
+                // 等待文件完全写入（防止文件锁问题）
+                Thread.Sleep(500);
+                if (e.FullPath != this.currentImage)
+                {
+                    this.currentImage = e.FullPath;
+                    this.Invoke((MethodInvoker)(() =>
+                    {
+                        ShowImage(e.FullPath);
+                    }));
+                }
+            };
+
             while (this.monitoring)
             {
-                string[] files = Directory.GetFiles(resultsFolderPath, "circle-image-*.png").OrderBy(f => f).ToArray();
-                if (files.Length > 0)
-                {
-                    string latestFile = files[files.Length - 1];
-                    if (latestFile != this.currentImage)
-                    {
-                        this.currentImage = latestFile;
-                        this.Invoke((MethodInvoker)(() =>
-                        {
-                            ShowImage(latestFile);
-                        }));
-                    }
-                }
-                Thread.Sleep(2000);
+                Thread.Sleep(100); // 保持线程运行
             }
+
+            watcher.EnableRaisingEvents = false;
         }
+
 
         private void ShowImage(string imagePath)
         {
